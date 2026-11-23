@@ -307,3 +307,7 @@ details.how summary{font-weight:800;cursor:pointer;color:var(--brown)}
 .verdict .want .sp{font-size:22px}
 .jn-s.jn-go{color:var(--red)}
 .go-s{line-height:1.35}
+.l-week{margin:6px 0 0;font-size:15px;color:var(--muted)}.l-week b{font-size:24px;color:var(--brown)}
+.l-today{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px}
+.l-entry{display:inline-flex;align-items:center;gap:2px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 10px;font-size:13px;font-weight:700}
+.x-mini{background:none;border:0;color:var(--faint);font-size:13px;padding:4px 6px;cursor:pointer}

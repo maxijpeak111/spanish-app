@@ -1,6 +1,6 @@
 // Network first, so updates show up as soon as you're online; cached copy is the offline fallback.
-const V = 'es-v3';
-const SHELL = ['./', 'index.html', 'style.css?v=3', 'manifest.webmanifest', 'js/seed.js?v=3', 'js/course.js?v=3', 'js/core.js?v=3', 'js/sync.js?v=3', 'js/views.js?v=3', 'js/lessons.js?v=3', 'js/practise.js?v=3', 'js/hoy.js?v=3', 'js/add.js?v=3', 'js/app.js?v=3'];
+const V = 'es-v4';
+const SHELL = ['./', 'index.html', 'style.css?v=4', 'manifest.webmanifest', 'js/seed.js?v=4', 'js/course.js?v=4', 'js/core.js?v=4', 'js/sync.js?v=4', 'js/views.js?v=4', 'js/lessons.js?v=4', 'js/practise.js?v=4', 'js/hoy.js?v=4', 'js/add.js?v=4', 'js/app.js?v=4'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
