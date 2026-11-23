@@ -32,7 +32,7 @@ function defaults() {
     settings: { name: '', newPerDay: 10 },
     folders: [], words: [], sentences: [], rules: [], weeks: [], quiz: [],
     week: { current: 1, done: {}, reviewed: {} },
-    srs: {}, quizStats: {}, tests: [], log: {}
+    srs: {}, quizStats: {}, tests: [], log: {}, mistakes: {}
   };
 }
 function seedInto(s) {
@@ -46,7 +46,8 @@ function seedInto(s) {
   // Words already confirmed in drills (✅) start as "known" cards, spread over the next two weeks so day one isn't a wall.
   const t = ES.today();
   s.words.filter(w => w.t.includes('ok')).forEach((w, i) => { s.srs[w.id] = { due: ES.addDays(t, i % 14), ivl: 3 + (i % 5), ease: 2.5, reps: 2, lapses: 0 }; });
-  TROUBLE.forEach(r => { s.quizStats[r] = { r: 0, w: 2, flag: true }; });
+  TROUBLE.forEach(r => { s.quizStats[r] = { r: 0, w: 2, flag: true }; s.mistakes[r] = { kind: 'rule', n: 2, last: t, from: 'Notion' }; });
+  s.words.filter(w => w.t.includes('stuck')).forEach(w => { s.mistakes[w.id] = { kind: 'item', n: 2, last: t, from: 'Notion' }; });
   return s;
 }
 function load() {
@@ -61,6 +62,13 @@ ES.save = () => {
   try { localStorage.setItem(KEY, JSON.stringify(ES.state)); return true; }
   catch (e) { alert('Could not save. Storage may be full or blocked in this browser.'); return false; }
 };
+// One-time: older installs get the Notion trouble spots and stuck words as starting mistakes.
+if (!ES.state.mistakesV) {
+  const s = ES.state, t = ES.today(); s.mistakes = s.mistakes || {};
+  Object.entries(s.quizStats || {}).forEach(([r, q]) => { if (q.flag && !s.mistakes[r]) s.mistakes[r] = { kind: 'rule', n: 2, last: t, from: 'Notion' }; });
+  (s.words || []).filter(w => (w.t || []).includes('stuck')).forEach(w => { if (!s.mistakes[w.id]) s.mistakes[w.id] = { kind: 'item', n: 2, last: t, from: 'Notion' }; });
+  s.mistakesV = 1;
+}
 ES.replaceState = obj => { const d = defaults(); ES.state = Object.assign(d, obj, { settings: Object.assign(d.settings, obj.settings || {}) }); ES.save(); };
 ES.save();
 
@@ -213,9 +221,23 @@ ES.troubleRules = () => ES.state.rules.filter(r => { const q = ES.state.quizStat
 ES.recordQuiz = (ruleId, right) => {
   const s = ES.state.quizStats, q = s[ruleId] = s[ruleId] || { r: 0, w: 0 };
   right ? q.r++ : q.w++;
+  ES.markMistake(ruleId, right, 'rule');
   if (q.flag && q.r >= 5 && ES.ruleScore(ruleId) >= 0.8) q.flag = false;
   ES.save();
 };
+
+/* ---------- my mistakes ----------
+   Anything missed in flashcards, typing, tests or quizzes lands here; today's session fixes these first.
+   An item clears after it's right twice in a row (once for words if it was a near-miss). */
+ES.markMistake = (id, right, kind) => {
+  const M = ES.state.mistakes = ES.state.mistakes || {};
+  if (!right) { const m = M[id] = M[id] || { kind: kind || 'item', n: 0 }; m.n++; m.ok = 0; m.last = ES.today(); delete m.from; return; }
+  const m = M[id]; if (!m) return;
+  m.ok = (m.ok || 0) + 1; if (m.ok >= 2) delete M[id];
+};
+ES.mistakeList = () => Object.entries(ES.state.mistakes || {})
+  .filter(([id, m]) => m.kind === 'rule' ? ES.rule(id) : ES.item(id) && ES.item(id).en)
+  .sort((a, b) => (b[1].last || '').localeCompare(a[1].last || '') || b[1].n - a[1].n);
 
 /* ---------- search across everything ---------- */
 ES.search = term => {

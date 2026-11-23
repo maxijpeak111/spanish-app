@@ -23,9 +23,9 @@ revisited and revised. A teaching side gets added later. Separate from the PT ap
 ## Files
 - `js/core.js` state, DOM helper `ES.h` / `ES.fill`, sheets (stacking), answer checking (`ES.check`: accents and missing article
   get partial credit), spaced repetition (`ES.grade`, SM-2 style Again/Hard/Good/Easy, `state.srs[id]`), search, rule mini-markup (`ES.rich`).
-- `js/views.js` Today (Hoy), Path + week pages, Library (search, folders, sentences, rules), word sheet, sentence page
+- `js/views.js` Today (Hoy) — owner chose layout B: one big "Start today's session" button (mistakes first, max 8, then due cards, then new) + 4 tiles (Mistakes to fix, Cards → deck picker, Want to know, This week). Keep Hoy calm: no lists of Spanish words on it. Path + week pages, Library (search, folders, sentences, rules), word sheet, sentence page
   ("How it's built" = `parts: [[word, role, why]]`, `pattern`, `rules`), rule page (+ owner's own notes `rule.mine`).
-- `js/practise.js` Flashcards (due + new per day; known cards alternate direction), Type the translation (accent buttons),
+- `js/practise.js` Runs are lists of steps `{k: card|type|quiz, id, fix}`. Deck picker (`ES.deckPicker`, `ES.DECKS`: today, random, mistakes, hotel, stuck, + word types = Notion folders, + any folder; direction mixed/Spanish/English first). My mistakes (`state.mistakes[id] = {kind: item|rule, n, ok, last}`, `ES.markMistake`; cleared after 2 right in a row; seeded from Notion trouble spots + stuck list). Flashcards (due + new per day; known cards alternate direction), Type the translation (accent buttons),
   Rule quiz (interleaved, weighted to trouble spots, never the same rule twice in a row), Cold test (20, no feedback until the end, history in `state.tests`).
 - `js/add.js` Quick add (+ button), "Want to know" inbox → Ask Claude (copy prompt, paste JSON back), Settings, paste-from-Claude.
 - `js/app.js` router + nav (Hoy, Path, Library, Practise).

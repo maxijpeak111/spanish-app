@@ -5,52 +5,34 @@ const back = (href, label) => h('a', { class: 'back', href }, '‹ ' + label);
 const tagIcons = t => (t || []).filter(x => ES.TAGS[x]).map(x => h('span', { class: 'ti', title: ES.TAGS[x][1] }, ES.TAGS[x][0]));
 const empty = text => h('div', { class: 'empty' }, text);
 
-/* =================== TODAY =================== */
+/* =================== TODAY (Hoy) — one button + four tiles =================== */
 ES.views.today = function (app) {
-  const s = S(), due = ES.dueIds().length, fresh = Math.min(ES.newLeft(), ES.newIds(ES.newLeft()).length);
-  const L = s.log[ES.today()] || {}, done = L.cards || 0, streak = ES.streak();
-  const wk = s.weeks.find(w => w.n === s.week.current) || s.weeks[0];
-  const inbox = ES.inbox(), trouble = ES.troubleRules().slice(0, 4);
-  const stuck = s.words.filter(w => (w.t || []).includes('stuck'));
-  const recent = s.words.concat(s.sentences).filter(x => x.added).sort((a, b) => b.added.localeCompare(a.added)).slice(0, 5);
-  const hello = s.settings.name ? '¡Hola, ' + s.settings.name + '!' : '¡Hola!';
+  const s = S();
+  const fix = ES.mistakeList().length, due = ES.dueIds().length, fresh = ES.newIds(ES.newLeft()).length;
+  const inbox = ES.inbox().length, wk = s.weeks.find(w => w.n === s.week.current) || s.weeks[0], wp = weekProgress(wk);
+  const streak = ES.streak(), doneToday = (s.log[ES.today()] || {}).cards || 0;
+  const todo = Math.min(fix, 8) + due + fresh;
+  const parts = [fix ? Math.min(fix, 8) + ' to fix' : null, due ? due + ' due' : null, fresh ? fresh + ' new' : null].filter(Boolean);
+  const tile = (num, label, href, onclick, accent) => h(href ? 'a' : 'button', { class: 'tile' + (accent ? ' accent' : ''), href, onclick },
+    h('span', { class: 't-num' }, num), h('span', { class: 't-lab' }, label));
+  const d = new Date();
   ES.fill(app,
-    h('div', { class: 'top' }, h('div', { class: 'grow' }, h('div', { class: 'brand' }, h('span', { class: 'flag' }), 'Mi Español'), h('h1', {}, hello)),
+    h('div', { class: 'top' },
+      h('div', { class: 'grow' }, h('div', { class: 'brand' }, h('span', { class: 'flag' }), d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })),
+        h('h1', {}, s.settings.name ? 'Hoy, ' + s.settings.name : 'Hoy')),
       h('button', { class: 'icon-btn', onclick: ES.settings, 'aria-label': 'Settings' }, '⚙')),
-    h('div', { class: 'info-line' }, h('span', {}, '🔥 ' + streak + (streak === 1 ? ' day' : ' days')), h('span', {}, '🧠 ' + ES.known() + ' known'), h('span', {}, '📚 ' + s.words.length + ' words')),
-    // today's practice
-    h('div', { class: 'hero' },
-      h('div', { class: 'hero-head' }, h('div', {}, h('div', { class: 'hero-title' }, 'Today\'s cards'), h('div', { class: 'hero-sub' }, due + ' to review · ' + fresh + ' new' + (done ? ' · ' + done + ' done today' : ''))),
-        h('div', { class: 'hero-num' }, due + fresh)),
-      h('div', { class: 'hero-body' },
-        due + fresh ? h('button', { class: 'btn block', onclick: () => ES.start('cards', { srs: true }) }, '▶ Start flashcards') : h('p', { class: 'muted', style: 'margin:8px 0' }, '✓ All caught up. Try a rule quiz or a cold test.'),
-        h('div', { class: 'grid2', style: 'margin-top:8px' },
-          h('button', { class: 'btn ghost small', onclick: () => ES.start('quiz', { mix: true, n: 10 }) }, '🧩 10-question mix'),
-          h('button', { class: 'btn ghost small', onclick: () => ES.testSetup() }, '📝 Cold test')))),
-    // path
-    h('h2', {}, 'Your path'),
-    h('a', { class: 'card tap path-card', href: '#week/' + wk.n },
-      h('div', { class: 'row between' }, h('span', { class: 'pill ' + weekPill(wk.n)[1] }, weekPill(wk.n)[0]), h('span', { class: 'muted small' }, 'Week ' + wk.n + ' of 13')),
-      h('div', { class: 'path-title' }, wk.title),
-      progress(weekProgress(wk)),
-      h('div', { class: 'small muted' }, weekProgress(wk).label)),
-    // inbox
-    inbox.length ? [h('h2', {}, 'Want to know', h('span', { class: 'count' }, inbox.length)),
-      h('a', { class: 'card tap alert', href: '#library/inbox' }, h('b', {}, '❓ ' + inbox.length + ' waiting for an explanation'),
-        h('div', { class: 'small muted' }, inbox.slice(0, 3).map(x => '"' + x.es + '"').join(' · ')),
-        h('div', { class: 'small', style: 'margin-top:6px;font-weight:700;color:var(--red)' }, 'Ask Claude to fill them in ›'))] : null,
-    // trouble spots
-    trouble.length ? [h('h2', {}, 'Trouble spots'),
-      h('div', { class: 'card' }, trouble.map(r => h('div', { class: 'item' },
-        h('a', { class: 'grow', href: '#rule/' + r.id }, h('div', { class: 't' }, r.title), h('div', { class: 'sub' }, scoreLine(r.id))),
-        h('button', { class: 'btn small', onclick: () => ES.start('quiz', { rule: r.id }) }, 'Quiz'))))] : null,
-    // stuck words
-    stuck.length ? [h('h2', {}, 'Stuck words'),
-      h('div', { class: 'card' }, h('p', { class: 'small muted', style: 'margin-top:0' }, 'Cold recall wasn\'t landing for these, so they come with memory tricks and example sentences.'),
-        h('div', { class: 'chips' }, stuck.map(w => h('span', { class: 'chip', onclick: () => ES.wordSheet(w.id) }, w.es))),
-        h('button', { class: 'btn small block', onclick: () => ES.start('cards', { ids: stuck.map(w => w.id), title: 'Stuck words' }) }, 'Flashcards: stuck words'))] : null,
-    recent.length ? [h('h2', {}, 'Recently added'), h('div', { class: 'card' }, recent.map(itemRow))] : null
-  );
+    todo ? h('button', { class: 'go', onclick: () => ES.start('today') },
+        h('span', { class: 'go-t' }, doneToday ? 'Carry on today\'s session' : 'Start today\'s session'),
+        h('span', { class: 'go-s' }, parts.join(' · ') + ' · about ' + Math.max(2, Math.round(todo * 0.25)) + ' min'),
+        h('span', { class: 'go-arrow' }, '▶'))
+      : h('div', { class: 'go done' }, h('span', { class: 'go-t' }, '✓ Done for today'), h('span', { class: 'go-s' }, 'Anything extra is a bonus'),
+        h('button', { class: 'btn ghost small', style: 'margin-top:10px', onclick: ES.deckPicker }, 'Practise more')),
+    h('div', { class: 'tiles' },
+      tile(fix, 'Mistakes to fix', '#mistakes', null, fix > 0),
+      tile(due + fresh, 'Cards', null, ES.deckPicker),
+      tile(inbox, 'Want to know', '#library/inbox', null, inbox > 0),
+      h('a', { class: 'tile', href: '#week/' + wk.n }, h('span', { class: 't-num' }, 'W' + wk.n), h('span', { class: 't-lab' }, 'This week · ' + Math.round(wp.pct * 100) + '%'))),
+    h('p', { class: 'foot' }, '🔥 ' + streak + (streak === 1 ? ' day' : ' days') + '  ·  ' + ES.known() + ' known  ·  ' + s.words.length + ' words'));
 };
 function scoreLine(id) {
   const q = S().quizStats[id] || {};
@@ -77,8 +59,8 @@ ES.views.path = function (app) {
   ES.fill(app,
     h('h1', {}, 'Your path'),
     h('p', { class: 'muted small' }, 'Hugo\'s Spanish in 3 Months, one week at a time. Weeks stay open until they\'re solid. You\'re restarting with a review of Weeks 1–3; Week 4 onwards is new.'),
-    h('div', { class: 'how card' },
-      h('b', {}, 'How each week flows'),
+    h('details', { class: 'how' },
+      h('summary', {}, 'How each week works'),
       h('ol', { class: 'flow' },
         h('li', {}, h('b', {}, 'Read the rule cards'), ' — short decision rules, not lists'),
         h('li', {}, h('b', {}, 'Quiz the rules'), ' — mixed questions beat one topic at a time'),
@@ -114,9 +96,9 @@ ES.views.week = function (app, n) {
     h('h2', {}, '2 · Quiz the rules'),
     qs.length ? h('button', { class: 'btn block', onclick: () => ES.start('quiz', { week: wk.n }) }, '🧩 Quiz Week ' + wk.n + ' (' + Math.min(qs.length, 12) + ' questions)') : empty('No quiz questions for this week yet.'),
     h('h2', {}, '3 · See it used'),
-    phrases.length ? h('div', { class: 'card' }, phrases.slice(0, 8).map(itemRow)) : empty('Sentences you add that use these rules show up here.'),
+    phrases.length ? h('div', { class: 'list' }, phrases.slice(0, 8).map(itemRow)) : empty('Sentences you add that use these rules show up here.'),
     h('h2', {}, '4 · Topics'),
-    h('div', { class: 'card' }, wk.topics.map((t, i) => h('label', { class: 'item' },
+    h('div', { class: 'list' }, wk.topics.map((t, i) => h('label', { class: 'item' },
       h('input', { type: 'checkbox', checked: !!rv[i], onchange: e => { rv[i] = e.target.checked; ES.bump('reviewed'); ES.save(); ES.render(); } }),
       h('div', { class: 'grow' }, h('div', { class: 't' }, t.t), h('div', { class: 'sub' }, ICON[t.s][0] + ' ' + ICON[t.s][1]))))),
     h('p', { class: 'small muted' }, 'Tick a topic once you\'ve reviewed it and can explain it in your own words.'),
@@ -140,7 +122,7 @@ ES.views.library = function (app, sub) {
   function drawResults() {
     if (!lib.q.trim()) { ES.fill(results, browse()); return; }
     const hits = ES.search(lib.q);
-    ES.fill(results, hits.length ? h('div', { class: 'card' }, hits.map(x => x.type === 'r' ? ruleRow(ES.rule(x.id)) : itemRow(ES.item(x.id))))
+    ES.fill(results, hits.length ? h('div', { class: 'list' }, hits.map(x => x.type === 'r' ? ruleRow(ES.rule(x.id)) : itemRow(ES.item(x.id))))
       : h('div', {}, empty('Nothing yet for "' + lib.q + '".'), h('button', { class: 'btn block', onclick: () => ES.quickAdd(lib.q) }, '＋ Add "' + lib.q + '"')));
   }
   function browse() {
@@ -155,10 +137,10 @@ ES.views.library = function (app, sub) {
       if (lib.kind === 'want') list = ES.inbox(); else if (lib.kind !== 'all') list = list.filter(x => x.kind === lib.kind);
       return [h('div', { class: 'chips' }, kinds.map(([k, l]) => h('span', { class: 'chip' + (lib.kind === k ? ' on' : ''), onclick: () => { lib.kind = k; ES.render(); } }, l))),
         lib.kind === 'want' ? ES.inboxPanel() : null,
-        list.length ? h('div', { class: 'card' }, list.map(itemRow)) : empty(lib.kind === 'want' ? 'Nothing waiting. Anything you add without a meaning lands here.' : lib.kind === 'lyric' ? 'Add lyric lines you hear with ＋ → Lyric.' : 'Nothing here yet.')];
+        list.length ? h('div', { class: 'list' }, list.map(itemRow)) : empty(lib.kind === 'want' ? 'Nothing waiting. Anything you add without a meaning lands here.' : lib.kind === 'lyric' ? 'Add lyric lines you hear with ＋ → Lyric.' : 'Nothing here yet.')];
     }
     const areas = [...new Set(s.rules.map(r => r.area))];
-    return areas.map(a => [h('h2', {}, a), h('div', { class: 'card' }, s.rules.filter(r => r.area === a).map(ruleRow))]);
+    return areas.map(a => [h('h2', {}, a), h('div', { class: 'list' }, s.rules.filter(r => r.area === a).map(ruleRow))]);
   }
   ES.fill(app,
     h('h1', {}, 'Library'),
@@ -180,17 +162,16 @@ ES.views.folder = function (app, id) {
     words.length ? h('div', { class: 'grid2', style: 'margin-bottom:12px' },
       h('button', { class: 'btn small', onclick: () => ES.start('cards', { ids: words.map(w => w.id), title: f.name }) }, '🃏 Flashcards'),
       h('button', { class: 'btn ghost small', onclick: () => ES.start('type', { ids: words.map(w => w.id), dir: 'en', n: 15, title: f.name }) }, '⌨️ Type it')) : null,
-    words.length ? h('div', { class: 'card' }, words.map(itemRow)) : empty('No words here yet. Add one with ＋.'));
+    words.length ? h('div', { class: 'list' }, words.map(itemRow)) : empty('No words here yet. Add one with ＋.'));
 };
 
 const itemRow = x => {
   if (!x) return null;
   const isW = !!x.f || x.id[0] === 'w';
-  const c = S().srs[x.id];
   return h('div', { class: 'item tap', onclick: () => isW ? ES.wordSheet(x.id) : (location.hash = '#s/' + x.id) },
-    h('div', { class: 'grow' }, h('div', { class: 't es' }, x.es, ' ', tagIcons(x.t)),
+    h('div', { class: 'grow' }, h('div', { class: 't es' }, x.es),
       h('div', { class: 'sub' }, x.want && !x.en ? '❓ waiting for a meaning' : x.en, !isW && ES.KINDS[x.kind] ? '  · ' + ES.KINDS[x.kind][0] : '')),
-    c ? h('span', { class: 'dot ' + (c.reps >= 2 ? 'known' : 'learning'), title: c.reps >= 2 ? 'Known' : 'Learning' }) : null);
+    h('span', { class: 'chev' }, '›'));
 };
 const ruleRow = r => r && h('a', { class: 'item', href: '#rule/' + r.id }, h('div', { class: 'grow' }, h('div', { class: 't' }, r.title), h('div', { class: 'sub' }, r.sum)), h('span', { class: 'chev' }, '›'));
 ES.itemRow = itemRow;
@@ -264,7 +245,7 @@ ES.views.s = function (app, id) {
       h('div', { class: 'p-w' }, p[0]), h('div', { class: 'p-r' }, p[1]), p[2] ? h('div', { class: 'p-y' }, p[2]) : null)))
       : h('div', {}, empty('No breakdown yet.'), x.want ? null : h('button', { class: 'btn ghost block', onclick: () => { x.want = true; ES.save(); ES.render(); ES.toast('Added to Want to know'); } }, '❓ Ask Claude for a breakdown')),
     x.pattern ? [h('h2', {}, 'Reuse the pattern'), h('div', { class: 'tip' }, x.pattern)] : null,
-    (x.rules || []).length ? [h('h2', {}, 'Rules in this sentence'), h('div', { class: 'card' }, x.rules.map(ES.rule).map(ruleRow))] : null,
+    (x.rules || []).length ? [h('h2', {}, 'Rules in this sentence'), h('div', { class: 'list' }, x.rules.map(ES.rule).map(ruleRow))] : null,
     h('p', { class: 'small muted', style: 'margin-top:16px' }, c ? 'In your flashcards · next ' + ES.inDays(c.due) : x.en ? 'Will come up as a new flashcard.' : ''),
     h('div', { class: 'grid2' },
       h('button', { class: 'btn small', onclick: () => ES.editSentence(x) }, '✎ Edit'),
@@ -303,7 +284,7 @@ ES.views.rule = function (app, id) {
     scoreLine(r.id) ? h('p', { class: 'small muted' }, '🧩 ' + scoreLine(r.id)) : null,
     h('div', { class: 'rule-body' }, ES.rich(r.body)),
     qs.length ? h('button', { class: 'btn block', onclick: () => ES.start('quiz', { rule: r.id }) }, '🧩 Quiz me on this (' + qs.length + ')') : null,
-    used.length ? [h('h2', {}, 'Your sentences using it'), h('div', { class: 'card' }, used.map(itemRow))] : null,
+    used.length ? [h('h2', {}, 'Your sentences using it'), h('div', { class: 'list' }, used.map(itemRow))] : null,
     h('h2', {}, 'My notes'),
     h('textarea', { placeholder: 'Your own words, examples, things that tripped you up…', value: r.mine || '', onchange: e => { r.mine = e.target.value; ES.save(); ES.toast('Saved'); } }));
 };
