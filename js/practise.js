@@ -187,10 +187,30 @@ ES.views.run = function (app) {
     h('span', { class: 'small muted run-count' }, done + '/' + total));
   if (R.i >= total) { ES.fill(app, head, summary()); return; }
   const st = R.steps[R.i];
-  ES.fill(app, head, st.k === 'card' ? card(st) : st.k === 'quiz' ? question(st) : typed(st));
+  if (st.k === 'lessonEnd') { ES.fill(app, head, lessonEnd(st)); return; }
+  ES.fill(app, head, st.k === 'card' ? card(st) : st.k === 'quiz' ? question(st) : st.k === 'screen' ? ES.renderScreen(st, next) : typed(st));
   const inp = app.querySelector('input.answer'); if (inp && !R.answered) setTimeout(() => inp.focus(), 50);
 };
-function next() { const R = ES.run; R.i++; R.flipped = false; R.answered = null; ES.render(); window.scrollTo(0, 0); }
+function next() {
+  const R = ES.run, cur = R.steps[R.i], nx = R.steps[R.i + 1];
+  if (cur && cur.seg && (!nx || nx.seg !== cur.seg)) ES.segDone(cur.seg);
+  R.i++; R.flipped = false; R.answered = null; ES.render(); window.scrollTo(0, 0);
+}
+ES.runNext = next;
+function lessonEnd(st) {
+  const R = ES.run;
+  if (!st.saved) {
+    const mine = R.results.filter(x => x.k === 'screen' && x.lesson === st.lesson);
+    st.score = mine.filter(x => x.ok).length; st.total = mine.length;
+    st.words = ES.finishLesson(st.lesson, st.score, st.total); st.saved = true;
+  }
+  const f = ES.lessonById(st.lesson);
+  return h('div', { class: 'run done' }, h('div', { class: 'cele-big' }, f && f.l.check ? '🏁' : '✅'),
+    h('div', { class: 'big-score' }, f ? ES.tpl(f.l.title) : 'Lesson done'),
+    st.total ? h('p', {}, st.score + ' / ' + st.total + ' right') : null,
+    st.words ? h('p', { class: 'small muted' }, st.words + ' new words added to your flashcards — first review tomorrow.') : null,
+    h('button', { class: 'btn block big', onclick: next }, R.i + 1 < R.steps.length ? 'Continue' : 'Finish'));
+}
 function stageLabel(st) {
   const R = ES.run;
   if (st.fix) return '⚠️ Fixing a mistake';
@@ -232,7 +252,8 @@ function card(st) {
 /* ----- type the translation & cold test ----- */
 function typed(st) {
   const R = ES.run, id = st.id, x = ES.item(id), test = R.mode === 'test';
-  const prompt = R.o.dir === 'en' ? x.en : x.es, want = R.o.dir === 'en' ? x.es : x.en;
+  const dir = st.dir || R.o.dir || 'en';
+  const prompt = dir === 'en' ? x.en : x.es, want = dir === 'en' ? x.es : x.en;
   let val = '';
   const submit = () => {
     if (R.answered) { next(); return; }
@@ -247,12 +268,12 @@ function typed(st) {
   };
   const a = R.answered;
   return h('div', { class: 'run' },
-    h('div', { class: 'run-tag' }, test ? '📝 Cold test' : '⌨️ Type it', ' · ', R.o.dir === 'en' ? 'in Spanish' : 'in English'),
-    h('div', { class: 'prompt' + (R.o.dir === 'en' ? '' : ' es') }, prompt),
+    h('div', { class: 'run-tag' }, test ? '📝 Cold test' : '⌨️ Type it', ' · ', dir === 'en' ? 'in Spanish' : 'in English'),
+    h('div', { class: 'prompt' + (dir === 'en' ? '' : ' es') }, prompt),
     h('form', { onsubmit: e => { e.preventDefault(); submit(); } },
-      h('input', { class: 'answer', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false', autocomplete: 'off', placeholder: R.o.dir === 'en' ? 'Type the Spanish…' : 'Type the English…', disabled: !!a,
+      h('input', { class: 'answer', autocapitalize: 'off', autocorrect: 'off', spellcheck: 'false', autocomplete: 'off', placeholder: dir === 'en' ? 'Type the Spanish…' : 'Type the English…', disabled: !!a,
         value: a ? R.results[R.results.length - 1].you : '', oninput: e => { val = e.target.value; } }),
-      R.o.dir === 'en' && !a ? accentBar() : null,
+      dir === 'en' && !a ? accentBar() : null,
       a ? h('div', { class: 'verdict ' + (a.ok === true ? 'ok' : a.ok ? 'part' : 'bad') },
         h('b', {}, a.ok === true ? '✓ Correct' : a.ok === 'accent' ? '≈ Nearly — watch the accent' : a.ok === 'article' ? '≈ Nearly — include the article (it shows the gender)' : '✗ Not quite'),
         a.ok !== true ? h('div', { class: 'want' }, want) : null) : null,
@@ -260,6 +281,7 @@ function typed(st) {
       !a && !test ? h('button', { class: 'btn ghost block', type: 'button', onclick: () => { val = ''; submit(); } }, 'I don\'t know') : null));
 }
 // Quick buttons for Spanish letters, so accents are easy on the iPhone keyboard.
+ES.accentBar = () => accentBar();
 function accentBar() {
   return h('div', { class: 'accents' }, ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'ü', '¿', '¡'].map(ch => h('button', { type: 'button', class: 'acc', onclick: e => {
     const inp = e.target.closest('form').querySelector('input.answer');
@@ -312,8 +334,10 @@ function summary() {
     if (R.mode === 'test' && !R.saved) { S().tests.push({ date: ES.today(), label: R.o.title || 'Words', dir: R.o.dir, score: ok, total: typedR.length }); R.saved = true; ES.save(); }
     if (misses.length) body.push(h('p', { class: 'small muted' }, 'Misses and near-misses are in My mistakes, so they come back.'),
       h('div', { class: 'list', style: 'text-align:left' }, misses.map(m => h('div', { class: 'item' },
-        h('div', { class: 'grow' }, h('div', { class: 't' }, m.want), h('div', { class: 'sub' }, (R.o.dir === 'en' ? ES.item(m.id).en : ES.item(m.id).es) + (m.you ? ' · you: ' + m.you : ' · skipped')))))));
+        h('div', { class: 'grow' }, h('div', { class: 't' }, m.want), h('div', { class: 'sub' }, (ES.plain(m.want) === ES.plain(ES.item(m.id).es) ? ES.item(m.id).en : ES.item(m.id).es) + (m.you ? ' · you: ' + m.you : ' · skipped')))))));
   }
+  const lessons = res.filter(x => x.k === 'screen');
+  if (lessons.length && !cards.length && !quiz.length && !typedR.length) title = 'Lesson done';
   if (R.mode === 'today') title = '¡Hecho!';
   return h('div', { class: 'run done' },
     h('div', { class: 'cele-big' }, '🎉'), h('div', { class: 'big-score' }, title), body,
@@ -324,6 +348,6 @@ function leave() { ES.run = null; document.body.classList.remove('running'); }
 function finish(early) {
   const R = ES.run;
   if (early && R && R.results.length && R.i < R.steps.length) { R.steps = R.steps.slice(0, R.i); ES.render(); return; }
-  leave(); ES.save(); location.hash = R && ['today', 'fix', 'cards'].includes(R.mode) ? '#today' : '#practise';
+  leave(); ES.save(); location.hash = R && R.mode === 'lesson' ? '#unit/' + ((ES.lessonById(R.o.lesson) || {}).u || {}).id : R && ['today', 'fix', 'cards'].includes(R.mode) ? '#today' : '#practise';
 }
 })();

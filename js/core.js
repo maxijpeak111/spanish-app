@@ -44,10 +44,8 @@ function seedInto(s) {
   // Restarting after a pause: Weeks 1–3 are review, Week 4 is the next new one.
   s.week = { current: 1, done: {}, reviewed: {}, plan: { 1: 'review', 2: 'review', 3: 'review' } };
   // Words already confirmed in drills (✅) start as "known" cards, spread over the next two weeks so day one isn't a wall.
-  const t = ES.today();
-  s.words.filter(w => w.t.includes('ok')).forEach((w, i) => { s.srs[w.id] = { due: ES.addDays(t, i % 14), ivl: 3 + (i % 5), ease: 2.5, reps: 2, lapses: 0 }; });
-  TROUBLE.forEach(r => { s.quizStats[r] = { r: 0, w: 2, flag: true }; s.mistakes[r] = { kind: 'rule', n: 2, last: t, from: 'Notion' }; });
-  s.words.filter(w => w.t.includes('stuck')).forEach(w => { s.mistakes[w.id] = { kind: 'item', n: 2, last: t, from: 'Notion' }; });
+  // The owner learns from zero: Notion content is course material, not progress. (TROUBLE kept for reference.)
+  s.mistakesV = 1;
   return s;
 }
 function load() {
@@ -69,7 +67,21 @@ if (!ES.state.mistakesV) {
   (s.words || []).filter(w => (w.t || []).includes('stuck')).forEach(w => { if (!s.mistakes[w.id]) s.mistakes[w.id] = { kind: 'item', n: 2, last: t, from: 'Notion' }; });
   s.mistakesV = 1;
 }
-ES.replaceState = obj => { const d = defaults(); ES.state = Object.assign(d, obj, { settings: Object.assign(d.settings, obj.settings || {}) }); ES.save(); };
+// Course v1 (Nov 2026): the owner restarts from zero on the new road. Progress resets once; his own words, sentences,
+// inbox and notes stay. Course rule cards and quiz questions are added to the Library.
+ES.courseSetup = function () {
+  const s = ES.state, C = window.ES_COURSE; if (!C) return;
+  if (!s.courseV) {
+    s.srs = {}; s.mistakes = {}; s.quizStats = {}; s.tests = []; s.course = { done: {} };
+    s.settings.size = s.settings.size || 'normal'; s.settings.interests = s.settings.interests || [];
+    s.courseV = 1;
+  }
+  (C.rules || []).forEach(r => { if (!s.rules.find(x => x.id === r.id)) s.rules.push(Object.assign({}, r, { body: r.body.trim() })); });
+  (C.quiz || []).forEach((q, i) => { const id = 'cq' + i; if (!s.quiz.find(x => x.id === id)) s.quiz.push(Object.assign({ id }, q)); });
+  ES.save();
+};
+ES.courseSetup();
+ES.replaceState = obj => { const d = defaults(); ES.state = Object.assign(d, obj, { settings: Object.assign(d.settings, obj.settings || {}) }); ES.courseSetup(); ES.save(); };
 ES.save();
 
 /* ---------- DOM helper (text is always text, never HTML) ---------- */
@@ -175,8 +187,9 @@ ES.newIds = n => {
   const s = ES.state, seen = id => s.srs[id];
   const ready = w => !w.want && w.en;
   const rank = w => w.t && w.t.includes('stuck') ? 0 : !w.t || !w.t.length || w.src ? 1 : w.t.includes('*') ? 2 : 4;
-  const words = s.words.filter(w => !seen(w.id) && ready(w)).map((w, i) => [rank(w), i, w.id]);
-  const sents = s.sentences.filter(x => !seen(x.id) && ready(x)).map((x, i) => [x.src && x.src !== 'Notion' ? 1 : 3, i, x.id]);
+  const mine = x => x.added && x.src !== 'Lesson'; // things you added yourself (seed content has no date)
+  const words = s.words.filter(w => !seen(w.id) && ready(w) && mine(w)).map((w, i) => [rank(w), i, w.id]);
+  const sents = s.sentences.filter(x => !seen(x.id) && ready(x) && mine(x)).map((x, i) => [1, i, x.id]);
   return words.concat(sents).sort((a, b) => a[0] - b[0] || a[1] - b[1]).slice(0, Math.max(0, n)).map(x => x[2]);
 };
 ES.newLeft = () => Math.max(0, (Number(ES.state.settings.newPerDay) || 10) - ES.newToday());

@@ -13,17 +13,34 @@ revisited and revised. A teaching side gets added later. Separate from the PT ap
 - Publishing = commit and push to `main`. Claude does this from chat; explain things in plain language.
 - Every release: bump `?v=N` on all script/css links in `index.html` and in `SHELL` in `sw.js`, and bump `V` in `sw.js`.
 
+## The course (v3, Nov 2026) — the owner restarted from zero
+- `js/course.js` = the road: levels A1 → A2 → B1, 26 situation units. Each unit has six lanes/lessons: sounds, words, grammar,
+  story, speak, check. Units 1–3 are fully written; the rest are mapped (goal, grammar, words) and get written by Claude via
+  "Ask Claude to write Unit N" (`ES.unitPrompt` builds a request from units done, check scores, weak rules, missed words, known
+  words and interests → reply `{"esUnit":1,"unit":{id, rules, lessons:[6]}, "rules":[…], "quiz":[…]}` → `state.customUnits[id]`).
+  This is how later units adapt to earlier ones. Hugo's book only influences content; don't name it in lessons.
+- Lesson screens: info, tip, ex (colour-coded chunks), words (become flashcards when the lesson ends), mc, build (tap words),
+  type, match, story (+ questions), speak (say aloud, self-rate). `{name}` = settings.name. Spain Spanish (vosotros, "th").
+- `js/lessons.js` speech (`ES.say`, `ES.sp` tap-to-hear, es-ES voice), course model, lesson player (`ES.renderScreen`), Road
+  (`#path`) and unit journey map (`#unit/id`), unit writing, today's session builder (`ES.startToday(size)`; Quick/Normal/Long;
+  segments warm → new → practise → check, logged in `log[date].segs`; mistakes tied to the current + previous unit's rules).
+- `js/hoy.js` Hoy: size picker, four-step strip, Continue button, feed (phrase of the day, quick check, linked mistake,
+  listening log with hour milestones, Want to know, current unit). `state.listen = {mins, days}`.
+- Interests: `settings.interests` (picked) + `settings.interestsText`; examples/phrases lean on them; unit requests include them.
+- `ES.courseSetup` (core.js) ran once to reset progress (srs, mistakes, quiz stats, tests) and adds course rule cards/quiz.
+  New flashcards come only from lessons (added straight to srs on finishing) and things the owner adds himself.
+
 ## Starting content
 - `js/seed.js` is generated ONCE from the owner's Notion Spanish Study Log (Nov 2026) by `build/` scripts (vocab.txt + content.py,
   not in this repo): 503 words in 21 folders (Notion's folders), 47 sentences/phrases, 27 rule cards, 13 Hugo weeks, 85 quiz questions.
   It only fills a brand-new install. After that the app's own data (and cloud copy) is the source of truth. Notion and the app are
   independent from here on.
-- Restart plan: owner paused after Week 3; Weeks 1–3 are marked review, current week starts at 1, Week 4 is the next new one.
+- The Notion content is course material (Library, rule cards, quiz bank, phrase pool), not progress.
 
 ## Files
 - `js/core.js` state, DOM helper `ES.h` / `ES.fill`, sheets (stacking), answer checking (`ES.check`: accents and missing article
   get partial credit), spaced repetition (`ES.grade`, SM-2 style Again/Hard/Good/Easy, `state.srs[id]`), search, rule mini-markup (`ES.rich`).
-- `js/views.js` Today (Hoy) — owner chose layout B: one big "Start today's session" button (mistakes first, max 8, then due cards, then new) + 4 tiles (Mistakes to fix, Cards → deck picker, Want to know, This week). Keep Hoy calm: no lists of Spanish words on it. Path + week pages, Library (search, folders, sentences, rules), word sheet, sentence page
+- `js/views.js` (old Today/Path/week views are superseded by hoy.js and lessons.js) Library, Library (search, folders, sentences, rules), word sheet, sentence page
   ("How it's built" = `parts: [[word, role, why]]`, `pattern`, `rules`), rule page (+ owner's own notes `rule.mine`).
 - `js/practise.js` Runs are lists of steps `{k: card|type|quiz, id, fix}`. Deck picker (`ES.deckPicker`, `ES.DECKS`: today, random, mistakes, hotel, stuck, + word types = Notion folders, + any folder; direction mixed/Spanish/English first). My mistakes (`state.mistakes[id] = {kind: item|rule, n, ok, last}`, `ES.markMistake`; cleared after 2 right in a row; seeded from Notion trouble spots + stuck list). Flashcards (due + new per day; known cards alternate direction), Type the translation (accent buttons),
   Rule quiz (interleaved, weighted to trouble spots, never the same rule twice in a row), Cold test (20, no feedback until the end, history in `state.tests`).

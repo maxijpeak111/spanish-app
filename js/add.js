@@ -143,7 +143,10 @@ ES.settings = function () {
   } });
   ES.sheet('Settings', h('div', {},
     ES.field('Your name (for the greeting)', h('input', { value: s.settings.name || '', onchange: e => { s.settings.name = e.target.value.trim(); ES.save(); ES.render(); } })),
-    ES.field('New flashcards per day', ES.chips([[5, '5'], [10, '10'], [15, '15'], [20, '20']], Number(s.settings.newPerDay) || 10, v => { s.settings.newPerDay = v || 10; ES.save(); ES.render(); })),
+    h('label', { class: 'f' }, 'Your interests — lessons and examples lean towards these'),
+    ES.chips(window.ES_COURSE.interests, s.settings.interests || [], v => { s.settings.interests = v || []; ES.save(); }, true),
+    ES.field('Anything else about you (Claude uses this when writing new units)', h('textarea', { value: s.settings.interestsText || '', placeholder: 'What you do, what you love, places you go…', onchange: e => { s.settings.interestsText = e.target.value.trim(); ES.save(); } })),
+    ES.field('New flashcards per day (from things you add yourself)', ES.chips([[5, '5'], [10, '10'], [15, '15'], [20, '20']], Number(s.settings.newPerDay) || 10, v => { s.settings.newPerDay = v || 10; ES.save(); ES.render(); })),
     h('h2', {}, 'Cloud save'),
     h('div', { class: 'card' }, ES.cloud.card()),
     h('h2', {}, 'Backup file'),

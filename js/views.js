@@ -277,7 +277,7 @@ ES.views.rule = function (app, id) {
   const used = S().sentences.filter(x => (x.rules || []).includes(r.id));
   const wk = S().weeks.find(w => w.n === r.week);
   ES.fill(app,
-    back(wk ? '#week/' + wk.n : '#library', wk ? 'Week ' + wk.n : 'Library'),
+    h('a', { class: 'back', href: 'javascript:history.back()' }, '‹ Back'),
     h('div', { class: 'brand' }, r.area + (r.week ? ' · Week ' + r.week : '')),
     h('h1', {}, r.title),
     h('div', { class: 'sum' }, r.sum),
