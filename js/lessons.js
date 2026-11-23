@@ -74,7 +74,7 @@ ES.finishLesson = (lessonId, score, total) => {
   const f = ES.lessonById(lessonId); if (!f) return 0;
   const n = learnWords(f.l);
   P().done[lessonId] = { date: ES.today(), score, total };
-  ES.bump('lessons'); ES.save();
+  ES.bump('lessons'); if (n) ES.bump('learned', n); ES.save();
   return n;
 };
 

@@ -219,7 +219,7 @@ ES.known = () => Object.values(ES.state.srs).filter(c => c.reps >= 2).length;
 /* ---------- activity log & streak ---------- */
 ES.bump = (k, n) => { const L = ES.state.log, t = ES.today(); L[t] = L[t] || {}; L[t][k] = (L[t][k] || 0) + (n || 1); };
 ES.streak = () => {
-  const L = ES.state.log, act = d => L[d] && ['cards', 'typed', 'quiz', 'test', 'added'].some(k => L[d][k]);
+  const L = ES.state.log, act = d => L[d] && ['cards', 'typed', 'quiz', 'test', 'added', 'lessons', 'listened'].some(k => L[d][k]);
   let d = ES.today(), n = 0;
   if (!act(d)) d = ES.addDays(d, -1);
   while (act(d)) { n++; d = ES.addDays(d, -1); }

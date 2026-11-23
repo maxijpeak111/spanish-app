@@ -24,8 +24,11 @@ revisited and revised. A teaching side gets added later. Separate from the PT ap
 - `js/lessons.js` speech (`ES.say`, `ES.sp` tap-to-hear, es-ES voice), course model, lesson player (`ES.renderScreen`), Road
   (`#path`) and unit journey map (`#unit/id`), unit writing, today's session builder (`ES.startToday(size)`; Quick/Normal/Long;
   segments warm → new → practise → check, logged in `log[date].segs`; mistakes tied to the current + previous unit's rules).
-- `js/hoy.js` Hoy: size picker, four-step strip, Continue button, feed (phrase of the day, quick check, linked mistake,
-  listening log with hour milestones, Want to know, current unit). `state.listen = {mins, days}`.
+- `js/hoy.js` Hoy (owner chose compact layout): Spanish date, size picker, four-step strip, Continue button, then pairs of tiles:
+  daily goal ring (4 steps + today's share of weekly listening) | current unit · "Esta semana" L–D dots + weekly stats · quick check ·
+  Fix this (linked mistake) | Another way (rotating alternative practice) · listening (log any minutes, remove entries, weekly
+  target, all-time hour milestones) · Want to know. Phrase of the day was removed at his request.
+  `state.listen = {mins, days, log:[{id,date,mins,what}], weekly}`.
 - Interests: `settings.interests` (picked) + `settings.interestsText`; examples/phrases lean on them; unit requests include them.
 - `ES.courseSetup` (core.js) ran once to reset progress (srs, mistakes, quiz stats, tests) and adds course rule cards/quiz.
   New flashcards come only from lessons (added straight to srs on finishing) and things the owner adds himself.

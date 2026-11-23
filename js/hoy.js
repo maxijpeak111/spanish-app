@@ -29,11 +29,67 @@ ES.views.today = function (app) {
       : h('div', { class: 'go done' }, h('span', { class: 'go-t' }, '✓ ¡Hecho! Done for today'), h('span', { class: 'go-s' }, 'Anything extra is a bonus'),
         h('div', { class: 'grid2', style: 'margin-top:10px' }, h('button', { class: 'btn ghost small', onclick: ES.deckPicker }, 'More cards'), nl.l ? h('button', { class: 'btn ghost small', onclick: () => ES.startLesson(nl.l.id) }, 'Next lesson') : h('a', { class: 'btn ghost small', href: '#path' }, 'Your road'))),
     nl.needsWriting ? h('a', { class: 'card alert tap', href: '#unit/' + nl.u.id }, h('b', {}, '✨ Unit ' + nl.u.n + ' is ready to be written for you'), h('div', { class: 'small' }, 'One copy and paste with Claude — it builds the unit from how you\'re doing.')) : null,
-    // feed
-    h('div', { class: 'feed' },
-      phraseOfDay(), quickCheck(), linkedMistake(), listenCard(), inboxCard(), unitCard()),
-    h('p', { class: 'foot' }, '🔥 ' + streak + (streak === 1 ? ' day' : ' days') + '  ·  ' + ES.known() + ' words known  ·  ' + listenHours() + 'h listening'));
+    // compact feed: two side by side where they fit
+    h('div', { class: 'feed compact' },
+      h('div', { class: 'pair' }, goalRing(plan), unitCard()),
+      weekStrip(),
+      quickCheck(),
+      pairOrOne(linkedMistake(), anotherWay()),
+      listenCard(),
+      inboxCard()));
 };
+
+const pairOrOne = (a, b) => a && b ? h('div', { class: 'pair' }, a, b) : (a || b);
+
+/* ----- daily goal ring: the four session steps + today's share of your weekly listening ----- */
+function goalRing(plan) {
+  const L = LST(), daily = Math.round(L.weekly / 7), today = L.days[ES.today()] || 0;
+  const steps = plan.filter(p => p.done).length;
+  const pct = Math.round(100 * (steps + Math.min(1, today / Math.max(1, daily))) / 5);
+  const R = 34, c = 2 * Math.PI * R;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 84 84'); svg.setAttribute('class', 'ring');
+  svg.innerHTML = '<circle cx="42" cy="42" r="' + R + '" fill="none" stroke="#efe6d8" stroke-width="9"/>' +
+    '<circle cx="42" cy="42" r="' + R + '" fill="none" stroke="' + (pct >= 100 ? '#2e9e5b' : '#c8102e') + '" stroke-width="9" stroke-linecap="round" stroke-dasharray="' + c + '" stroke-dashoffset="' + (c * (1 - pct / 100)) + '" transform="rotate(-90 42 42)"/>';
+  const st = ES.streak();
+  return h('div', { class: 'fcard tile-c' }, h('div', { class: 'f-k' }, 'Today\'s goal'),
+    h('div', { class: 'ring-wrap' }, svg, h('div', { class: 'ring-n' }, pct + '%')),
+    h('div', { class: 'small muted', style: 'text-align:center' }, steps + '/4 steps · ' + today + '/' + daily + ' min'),
+    h('div', { class: 'small', style: 'text-align:center;font-weight:800;color:var(--brown);margin-top:2px' }, '🔥 ' + st + (st === 1 ? ' day' : ' days')));
+}
+
+/* ----- this week: Mon–Sun dots + what you got done ----- */
+function weekStrip() {
+  const ws = weekStart(), Lg = S().log, letters = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+  const act = d => Lg[d] && ['cards', 'typed', 'quiz', 'test', 'lessons', 'listened', 'added'].some(k => Lg[d][k]);
+  let words = 0, lessons = 0;
+  const days = letters.map((l, i) => { const d = ES.addDays(ws, i); const x = Lg[d] || {}; words += x.learned || 0; lessons += x.lessons || 0; return { l, d, on: act(d), today: d === ES.today(), future: d > ES.today() }; });
+  return h('div', { class: 'fcard' }, h('div', { class: 'f-k' }, 'Esta semana'),
+    h('div', { class: 'wk-dots' }, days.map(x => h('div', { class: 'wk-d' + (x.on ? ' on' : '') + (x.today ? ' today' : '') + (x.future ? ' fut' : '') }, h('span', {}, x.on ? '✓' : ''), h('i', {}, x.l)))),
+    h('div', { class: 'wk-stats' }, h('span', {}, h('b', {}, words), ' new words'), h('span', {}, h('b', {}, lessons), ' lessons'), h('span', {}, h('b', {}, fmt(weekMins())), ' listening')));
+}
+
+/* ----- another way to learn: a different kind of practice each day ----- */
+let altShift = 0;
+function anotherWay() {
+  const learned = Object.keys(S().srs).filter(id => ES.word(id) && ES.word(id).en);
+  const doneLessons = ES.units().flatMap(u => (u.lessons || []).filter(l => ES.lessonDone(l.id)));
+  const story = doneLessons.filter(l => l.lane === 'story'), speak = doneLessons.filter(l => l.lane === 'speak');
+  const ideas = [
+    learned.length >= 5 && ['⌨️', 'Type 5 words', 'Spell them from memory, accents and all', () => ES.start('type', { ids: learned, dir: 'en', n: 5, title: 'Quick 5' })],
+    ['🧩', 'Rule mix', '6 questions, different topic every time', () => ES.start('quiz', { mix: true, n: 6 })],
+    story.length && ['📖', 'Re-read a story', 'Read it without tapping English, then the questions', () => ES.startLesson(story[Math.floor(Math.random() * story.length)].id)],
+    speak.length && ['🗣️', 'Speak again', 'Say the lines out loud — faster than last time', () => ES.startLesson(speak[Math.floor(Math.random() * speak.length)].id)],
+    learned.length >= 8 && ['📝', 'Mini cold test', 'No hints — just you and the words', () => ES.start('test', { ids: learned, dir: 'en', n: 10, title: 'Mini test' })],
+    learned.length >= 4 && ['🔁', 'Spanish first', 'See the Spanish, say the English — the other direction', () => ES.start('cards', { ids: learned, dir: 'es', n: 10, deck: 'x' })],
+    ['🎧', 'Shadowing', 'Tap a phrase, listen, then copy the rhythm out loud 3 times', () => { location.hash = '#library'; ES.lib.tab = 'sent'; ES.lib.kind = 'all'; ES.render(); }]
+  ].filter(Boolean);
+  const idea = ideas[(dayNum() + altShift) % ideas.length];
+  return h('div', { class: 'fcard tile-c' }, h('div', { class: 'f-k' }, 'Another way'),
+    h('div', { class: 'aw-i' }, idea[0]), h('div', { class: 'aw-t' }, idea[1]), h('div', { class: 'small muted' }, idea[2]),
+    h('button', { class: 'btn small block', onclick: idea[3] }, 'Try it'),
+    h('button', { class: 'f-link', onclick: () => { altShift++; ES.render(); } }, 'Other idea ›'));
+}
 
 /* ----- phrase of the day: from your lessons' stories, leaning on your interests ----- */
 function phraseOfDay() {
@@ -72,10 +128,9 @@ function linkedMistake() {
   const m = ES.topicMistakes()[0]; if (!m) return null;
   const [id, info] = m, isRule = info.kind === 'rule', x = isRule ? ES.rule(id) : ES.item(id);
   if (!x) return null;
-  return h('div', { class: 'fcard warn' }, h('div', { class: 'f-k' }, 'Your mistake · linked to today'),
-    h('div', { class: 'f-es' }, isRule ? x.title : x.es), h('div', { class: 'f-en' }, isRule ? x.sum : x.en),
-    h('div', { class: 'small' }, 'It\'s in today\'s warm-up' + (ES.topicMistakes().length > 1 ? ' with ' + (ES.topicMistakes().length - 1) + ' more' : '') + '.'),
-    h('a', { class: 'f-link', href: '#mistakes' }, 'All my mistakes ›'));
+  return h('div', { class: 'fcard warn tile-c' }, h('div', { class: 'f-k' }, 'Fix this'),
+    h('div', { class: 'f-es small-es' }, isRule ? x.title : x.es), h('div', { class: 'f-en clamp' }, isRule ? x.sum : x.en),
+    h('a', { class: 'f-link', href: '#mistakes' }, (ES.topicMistakes().length > 1 ? (ES.topicMistakes().length - 1) + ' more' : 'My mistakes') + ' ›'));
 }
 
 /* ----- listening: log any amount, undo mistakes, work towards a weekly target; total hours show long-term level ----- */
@@ -138,7 +193,7 @@ function inboxCard() {
 function unitCard() {
   const u = ES.currentUnit();
   const n = (u.lessons || []).filter(l => ES.lessonDone(l.id)).length;
-  return h('a', { class: 'fcard tap', href: '#unit/' + u.id }, h('div', { class: 'f-k' }, 'Your road · ' + u.level + ' · Unit ' + u.n),
+  return h('a', { class: 'fcard tap tile-c', href: '#unit/' + u.id }, h('div', { class: 'f-k' }, u.level + ' · Unit ' + u.n),
     h('div', { class: 'f-es small-es' }, u.title), h('div', { class: 'f-en' }, u.place),
     u.lessons ? h('div', { class: 'bar' }, h('i', { style: 'width:' + Math.round(100 * n / u.lessons.length) + '%' })) : null);
 }
